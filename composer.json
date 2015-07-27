@@ -1,0 +1,9 @@
+{
+  "name": "webchemistry/forms-doctrine",
+  "type": "library",
+  "description": "Helper for doctrine forms",
+  "keywords": ["nette", "webchemistry", "forms", "doctrine", "helper"],
+  "autoload": {
+    "classmap": ["src/"]
+  }
+}
