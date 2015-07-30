@@ -5,18 +5,11 @@ namespace WebChemistry\Forms;
 use Nette;
 
 use Doctrine as Doc;
-use Exception;
 
 class Doctrine extends Nette\Object {
 
 	/** @var Doc\ORM\EntityManager */
 	private $em;
-
-	/** @var array */
-	private $items = array();
-
-	/** @var bool */
-	private $isItemsOriginal = TRUE;
 
 	/**
 	 * @param Doc\ORM\EntityManager $em
@@ -25,33 +18,23 @@ class Doctrine extends Nette\Object {
 		$this->em = $em;
 	}
 
-	/**
-	 * Transform entity to array
-	 *
-	 * @param object $entity
-	 * @param bool   $primary
-	 * @return array
-	 * @throws Exception
-	 */
-	public function toArray($entity, $primary = FALSE) {
-		if (!is_object($entity)) {
-			throw new Exception('Entity must be object.');
-		}
-
+	private function buildArray($entity, array $items = array(), $primary = FALSE) {
 		$meta = $this->em->getClassMetadata(get_class($entity));
 		$return = array();
 
 		foreach ($meta->columnNames as $name => $void) {
-			$return[$name] = $entity->$name;
+			if ($this->checkItem($name, $items)) {
+				$return[$name] = $entity->$name;
+			}
 		}
 
 		foreach ($meta->getAssociationMappings() as $name => $info) {
-			if (!isset($entity->$name) || !$entity->$name instanceof $info['targetEntity']) {
+			if (!isset($entity->$name) || !$entity->$name instanceof $info['targetEntity'] || !$this->checkItem($name, $items, TRUE)) {
 				continue;
 			}
 
 			if ($primary === FALSE) {
-				$return[$name] = $this->toArray($entity->$name, $primary);
+				$return[$name] = $this->buildArray($entity->$name, array_key_exists($name, $items) && is_array($items[$name]) ? $items[$name] : array(), $primary);
 			} else {
 				if (method_exists($info['targetEntity'], '__toString')) {
 					$return[$name] = (string) $entity->$name;
@@ -76,80 +59,108 @@ class Doctrine extends Nette\Object {
 	}
 
 	/**
-	 * Transform array to entity
+	 * Transform entity to array
 	 *
+	 * @param object $entity
+	 * @param array  $items
+	 * @param bool   $primary
+	 * @return array
+	 * @throws Exception
+	 */
+	public function toArray($entity, array $items = array(), $primary = FALSE) {
+		if (!is_object($entity)) {
+			throw new \Exception('Entity must be object.');
+		}
+
+		return $this->buildArray($entity, $this->parseItems($items), $primary);
+	}
+
+	/**
 	 * @param object $entity
 	 * @param array  $values
 	 * @param array  $items
-	 * @return mixed
+	 * @return object
 	 */
-	public function toEntity($entity, $values, array $items = array()) {
-		if (!is_object($entity)) {
-			$entityName = $entity;
-			$entity = new $entity;
-		} else {
-			$entityName = get_class($entity);
-		}
-
-		$items = $this->setItems($items);
-
-		$meta = $this->em->getClassMetadata($entityName);
+	public function buildEntity($entity, array $values, array $items) {
+		$meta = $this->em->getClassMetadata(get_class($entity));
 
 		foreach ($meta->columnNames as $name => $void) {
-			if (array_key_exists($name, $values) && $this->checkItem($name)) {
+			if (array_key_exists($name, $values) && $this->checkItem($name, $items)) {
 				$entity->$name = $values[$name];
 			}
 		}
 
 		foreach ($meta->getAssociationMappings() as $name => $info) {
-			if (!array_key_exists($name, $values) || !$entity->$name instanceof $info['targetEntity'] || !$this->checkItem($name, TRUE)) {
+			if (!array_key_exists($name, $values) || !$this->checkItem($name, $items, TRUE)) {
 				continue;
 			}
 
-			$this->setItems($items);
+			if (!$entity->$name instanceof $info['targetEntity']) {
+				$entity->$name = new $info['targetEntity'];
+			}
 
-			$entity->$name = $this->toEntity($entity->$name, $values[$name], array_key_exists($name, $items) ? $items[$name] : array());
+			if (!is_array($values[$name]) && $values[$name] !== NULL) {
+				$entity->$name = NULL;
+				continue; // Exception?
+			}
+
+			$entity->$name = $this->buildEntity($entity->$name, $values[$name], array_key_exists($name, $items) && is_array($items[$name]) ? $items[$name] : array());
 		}
-
-		$this->isItemsOriginal = TRUE;
 
 		return $entity;
 	}
 
-	private function setItems(array $items) {
-		if (!$this->isItemsOriginal) {
-			$this->items = $items;
-
-			return $this->items;
+	/**
+	 * Transform array to entity
+	 *
+	 * @param object|string $entity
+	 * @param array  $values
+	 * @param array  $items
+	 * @return mixed
+	 */
+	public function toEntity($entity, array $values, array $items = array()) {
+		if (!is_object($entity)) {
+			$entity = new $entity;
 		}
 
-		foreach ($items as $name) {
-			if (strpos($name, '.') !== FALSE) {
-				$current = &$this->items;
+		return $this->buildEntity($entity, $values, $this->parseItems($items));
+	}
 
-				foreach (explode('.', $name) as $row) {
-					$current[$row] = array();
-					$current = &$current[$row];
-				}
-			} else {
-				$this->items[$name] = array();
+	/**
+	 * @param array $items
+	 * @return array
+	 */
+	private function parseItems(array $items) {
+		$result = array();
+
+		foreach ($items as $name => $value) {
+			if (is_string($value)) {
+				$result[$value] = TRUE;
+			} else if (is_array($value)) {
+				$result[$name] = $this->parseItems($value);
+			} else if (is_bool($value)) {
+				$result[$name] = $value;
 			}
 		}
 
-		$this->isItemsOriginal = FALSE;
-
-		return $this->items;
+		return $result;
 	}
 
-	private function checkItem($name, $isAssociation = FALSE) {
-		if (!$this->items) {
+	/**
+	 * @param string     $name
+	 * @param array|bool $items
+	 * @param bool       $isAssociation
+	 * @return bool
+	 */
+	private function checkItem($name, $items, $isAssociation = FALSE) {
+		if (!$items) {
 			return TRUE;
 		}
 
 		if ($isAssociation) {
-			return array_key_exists($name, $this->items) && $this->items[$name];
+			return array_key_exists($name, $items) && $items[$name] !== FALSE;
 		}
 
-		return array_key_exists($name, $this->items);
+		return array_key_exists($name, $items);
 	}
 }
