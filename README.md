@@ -53,3 +53,23 @@ public function afterSign(WebChemistry\Forms\Application\Form $form) {
 }
 
 ```
+
+## Export vybraných položek
+
+```php
+public function export() {
+    $exclude = array(
+        '*', // Vybere všechny položky 
+        '~name', // Vynechá položku name
+        'cart' => array('~id') // Vynechá položku id v cart
+    );
+
+    $this->doctrine->toArray($this->entity, $exclude);
+    
+    $include = array(
+        'name', // Vybere položku name,
+        'cart' => array('*'), // Vybere všechny položky v cart
+        'history' => array('id') // Vybere položku id v history
+    );
+}
+```

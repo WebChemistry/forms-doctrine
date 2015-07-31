@@ -18,7 +18,21 @@ class Doctrine extends Nette\Object {
 		$this->em = $em;
 	}
 
-	private function buildArray($entity, array $items = array(), $primary = FALSE) {
+	/**
+	 * @param string $name
+	 * @param mixed $items
+	 * @return array
+	 */
+	private function getItems($name, $items) {
+		return array_key_exists($name, $items) && is_array($items[$name]) ? $items[$name] : array();
+	}
+
+	/**
+	 * @param object $entity
+	 * @param array  $items
+	 * @return array
+	 */
+	private function buildArray($entity, array $items = array()) {
 		$meta = $this->em->getClassMetadata(get_class($entity));
 		$return = array();
 
@@ -29,30 +43,33 @@ class Doctrine extends Nette\Object {
 		}
 
 		foreach ($meta->getAssociationMappings() as $name => $info) {
-			if (!isset($entity->$name) || !$entity->$name instanceof $info['targetEntity'] || !$this->checkItem($name, $items, TRUE)) {
+			if ($info['isOwningSide'] === FALSE) {
 				continue;
 			}
 
-			if ($primary === FALSE) {
-				$return[$name] = $this->buildArray($entity->$name, array_key_exists($name, $items) && is_array($items[$name]) ? $items[$name] : array(), $primary);
-			} else {
-				if (method_exists($info['targetEntity'], '__toString')) {
-					$return[$name] = (string) $entity->$name;
-
-					continue;
-				}
-
-				$targetMeta = $this->em->getClassMetadata($info['targetEntity']);
-				$ids = $targetMeta->getIdentifier();
-
-				if (!$ids) {
-					throw new Exception("Entity $info[targetEntity] does not have identifier.");
-				}
-
-				$id = reset($ids);
-
-				$return[$name] = $entity->$id;
+			if (!isset($entity->$name) || !$this->checkItem($name, $items, TRUE)) {
+				continue;
 			}
+
+			if ($info['type'] === Doc\ORM\Mapping\ClassMetadata::MANY_TO_MANY) {
+				$return[$name] = array();
+
+				foreach ($entity->$name as $index => $row) {
+					$return[$name][$index] = $this->buildArray($row, $this->getItems($name, $items));
+				}
+
+				continue;
+			}
+
+			if (!$entity->$name instanceof $info['targetEntity']) {
+				if ($this->checkItem($name, $items, TRUE)) {
+					$return[$name] = NULL; // Empty entity
+				}
+
+				continue;
+			}
+
+			$return[$name] = $this->buildArray($entity->$name, $this->getItems($name, $items));
 		}
 
 		return $return;
@@ -63,16 +80,15 @@ class Doctrine extends Nette\Object {
 	 *
 	 * @param object $entity
 	 * @param array  $items
-	 * @param bool   $primary
 	 * @return array
 	 * @throws Exception
 	 */
-	public function toArray($entity, array $items = array(), $primary = FALSE) {
+	public function toArray($entity, array $items = array()) {
 		if (!is_object($entity)) {
 			throw new \Exception('Entity must be object.');
 		}
 
-		return $this->buildArray($entity, $this->parseItems($items), $primary);
+		return $this->buildArray($entity, $this->parseItems($items));
 	}
 
 	/**
@@ -91,7 +107,23 @@ class Doctrine extends Nette\Object {
 		}
 
 		foreach ($meta->getAssociationMappings() as $name => $info) {
+			if ($info['isOwningSide'] === FALSE) {
+				continue;
+			}
+
 			if (!array_key_exists($name, $values) || !$this->checkItem($name, $items, TRUE)) {
+				continue;
+			}
+
+			if ($info['type'] === Doc\ORM\Mapping\ClassMetadata::MANY_TO_MANY) {
+				foreach ($values[$name] as $row) {
+					if (!is_array($row)) {
+						continue; // Exception?
+					}
+
+					call_user_func(array($entity, 'add' . $name), $this->buildEntity(new $info['targetEntity'], $row, $this->getItems($name, $items)));
+				}
+
 				continue;
 			}
 
@@ -99,12 +131,12 @@ class Doctrine extends Nette\Object {
 				$entity->$name = new $info['targetEntity'];
 			}
 
-			if (!is_array($values[$name]) && $values[$name] !== NULL) {
+			if (!is_array($values[$name])) {
 				$entity->$name = NULL;
 				continue; // Exception?
 			}
 
-			$entity->$name = $this->buildEntity($entity->$name, $values[$name], array_key_exists($name, $items) && is_array($items[$name]) ? $items[$name] : array());
+			$entity->$name = $this->buildEntity($entity->$name, $values[$name], $this->getItems($name, $items));
 		}
 
 		return $entity;
@@ -131,16 +163,32 @@ class Doctrine extends Nette\Object {
 	 * @return array
 	 */
 	private function parseItems(array $items) {
+		if (!$items) {
+			return array();
+		}
+
 		$result = array();
+		$isAll = TRUE;
+
 
 		foreach ($items as $name => $value) {
-			if (is_string($value)) {
-				$result[$value] = TRUE;
-			} else if (is_array($value)) {
-				$result[$name] = $this->parseItems($value);
-			} else if (is_bool($value)) {
-				$result[$name] = $value;
+			if (is_int($name)) {
+				if (!Nette\Utils\Strings::startsWith($value, '~')) {
+					$isAll = FALSE;
+				}
+
+				$result[$value] = '*';
+			} else {
+				if (!Nette\Utils\Strings::startsWith($name, '~')) {
+					$isAll = FALSE;
+				}
+
+				$result[$name] = is_array($value) ? $this->parseItems($value) : $value;
 			}
+		}
+
+		if ($isAll) {
+			$result['*'] = '*';
 		}
 
 		return $result;
@@ -157,8 +205,18 @@ class Doctrine extends Nette\Object {
 			return TRUE;
 		}
 
+		// Exclude
+		if (array_key_exists('~' . $name, $items)) {
+			return FALSE;
+		}
+
+		// Allow all
+		if (array_key_exists('*', $items)) {
+			return TRUE;
+		}
+
 		if ($isAssociation) {
-			return array_key_exists($name, $items) && $items[$name] !== FALSE;
+			return array_key_exists($name, $items);
 		}
 
 		return array_key_exists($name, $items);

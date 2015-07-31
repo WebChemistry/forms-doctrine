@@ -1,0 +1,13 @@
+extensions:
+    console: Kdyby\Console\DI\ConsoleExtension
+    events: Kdyby\Events\DI\EventsExtension
+    annotations: Kdyby\Annotations\DI\AnnotationsExtension
+    doctrine: Kdyby\Doctrine\DI\OrmExtension
+    helper: WebChemistry\Forms\DI\DoctrineExtension
+
+doctrine:
+    user: root
+    password:
+    dbname: test
+    metadata:
+        Entity: %appDir%
