@@ -5,11 +5,21 @@ namespace WebChemistry\Forms;
 use Nette;
 
 use Doctrine as Doc;
+use WebChemistry\Forms\Doctrine\Settings;
 
 class Doctrine extends Nette\Object {
 
 	/** @var Doc\ORM\EntityManager */
 	private $em;
+
+	/** @var array */
+	private $path = array();
+
+	/** @var Settings */
+	private $settings;
+
+	/** @var array|entity */
+	private $original;
 
 	/**
 	 * @param Doc\ORM\EntityManager $em
@@ -19,60 +29,93 @@ class Doctrine extends Nette\Object {
 	}
 
 	/**
-	 * @param string $name
-	 * @param mixed $items
-	 * @return array
-	 */
-	private function getItems($name, $items) {
-		return array_key_exists($name, $items) && is_array($items[$name]) ? $items[$name] : array();
-	}
-
-	/**
 	 * @param object $entity
-	 * @param array  $items
 	 * @return array
 	 */
-	private function buildArray($entity, array $items = array()) {
+	private function buildArray($entity) {
 		$meta = $this->em->getClassMetadata(get_class($entity));
 		$return = array();
 
 		foreach ($meta->columnNames as $name => $void) {
-			if ($this->checkItem($name, $items)) {
-				$return[$name] = $entity->$name;
+			if ($this->checkItem($name)) {
+				// Custom callback
+				if ($callback = $this->settings->getCallback($this->getPathName($name))) {
+					$return[$name] = $callback($entity->$name, $this->original);
+				} else {
+					$return[$name] = $entity->$name;
+				}
 			}
 		}
 
 		foreach ($meta->getAssociationMappings() as $name => $info) {
+			if (!$this->checkItem($name)) {
+				continue;
+			}
+
 			if ($info['isOwningSide'] === FALSE) {
 				continue;
 			}
 
-			if (!isset($entity->$name) || !$this->checkItem($name, $items, TRUE)) {
+			if (!isset($entity->$name)) {
 				continue;
+			}
+
+			// Custom callback
+			if ($callback = $this->settings->getCallback($this->getPathName($name))) {
+				// Can be use as reference
+				$continue = FALSE;
+
+				$return[$name] = $callback($entity->$name, $this->original, $continue);
+
+				if (!$continue) {
+					continue;
+				}
 			}
 
 			if ($info['type'] === Doc\ORM\Mapping\ClassMetadata::MANY_TO_MANY) {
 				$return[$name] = array();
 
 				foreach ($entity->$name as $index => $row) {
-					$return[$name][$index] = $this->buildArray($row, $this->getItems($name, $items));
+					$this->path[] = $name;
+					$return[$name][$index] = $this->buildArray($row);
+					array_pop($this->path);
 				}
 
 				continue;
 			}
 
 			if (!$entity->$name instanceof $info['targetEntity']) {
-				if ($this->checkItem($name, $items, TRUE)) {
+				if ($this->checkItem($name)) {
 					$return[$name] = NULL; // Empty entity
 				}
 
 				continue;
 			}
 
-			$return[$name] = $this->buildArray($entity->$name, $this->getItems($name, $items));
+			if ($joinColumn = $this->settings->getJoinOneColumn($this->getPathName($name))) {
+				if (!is_callable($joinColumn)) {
+					$return[$name] = $entity->$name->$joinColumn;
+				} else {
+					$joinColumn($entity->$name, $return);
+				}
+
+				continue;
+			}
+
+			$this->path[] = $name;
+			$return[$name] = $this->buildArray($entity->$name);
+			array_pop($this->path);
 		}
 
 		return $return;
+	}
+
+	/**
+	 * @param string $name
+	 * @return string
+	 */
+	protected function getPathName($name) {
+		return implode('.', $this->path) . ($this->path ? '.' : '') . $name;
 	}
 
 	/**
@@ -80,15 +123,20 @@ class Doctrine extends Nette\Object {
 	 *
 	 * @param object $entity
 	 * @param array  $items
+	 * @param Settings $settings
 	 * @return array
 	 * @throws Exception
 	 */
-	public function toArray($entity, array $items = array()) {
+	public function toArray($entity, Settings $settings = NULL) {
 		if (!is_object($entity)) {
 			throw new \Exception('Entity must be object.');
 		}
 
-		return $this->buildArray($entity, $this->parseItems($items));
+		$this->original = $entity;
+		$this->path = array();
+		$this->settings = $settings ? : new Settings;
+
+		return $this->buildArray($entity);
 	}
 
 	/**
@@ -97,31 +145,58 @@ class Doctrine extends Nette\Object {
 	 * @param array  $items
 	 * @return object
 	 */
-	public function buildEntity($entity, array $values, array $items) {
+	public function buildEntity($entity, array $values) {
 		$meta = $this->em->getClassMetadata(get_class($entity));
 
 		foreach ($meta->columnNames as $name => $void) {
-			if (array_key_exists($name, $values) && $this->checkItem($name, $items)) {
-				$entity->$name = $values[$name];
+			if (array_key_exists($name, $values) && $this->checkItem($name)) {
+				// Custom callback
+				if ($callback = $this->settings->getCallback($this->getPathName($name))) {
+					$entity->$name = $callback($values[$name], $this->original);
+				} else {
+					$entity->$name = $values[$name];
+				}
 			}
 		}
 
 		foreach ($meta->getAssociationMappings() as $name => $info) {
+			if (!$this->checkItem($name)) {
+				continue;
+			}
+
 			if ($info['isOwningSide'] === FALSE) {
 				continue;
 			}
 
-			if (!array_key_exists($name, $values) || !$this->checkItem($name, $items, TRUE)) {
+			if (!array_key_exists($name, $values)) {
 				continue;
+			}
+
+			// Custom callback
+			if ($callback = $this->settings->getCallback($this->getPathName($name))) {
+				// Can be use as reference
+				$continue = FALSE;
+
+				$return[$name] = $callback($values[$name], $this->original, $continue);
+
+				if (!$continue) {
+					continue;
+				}
 			}
 
 			if ($info['type'] === Doc\ORM\Mapping\ClassMetadata::MANY_TO_MANY) {
 				foreach ($values[$name] as $row) {
-					if (!is_array($row)) {
-						continue; // Exception?
+					if (!$row instanceof $info['targetEntity']) {
+						if (is_array($row)) {
+							$this->path[] = $name;
+							$row = $this->buildEntity(new $info['targetEntity'], $row);
+							array_pop($this->path);
+						} else {
+							continue; // Exception?
+						}
 					}
 
-					call_user_func(array($entity, 'add' . $name), $this->buildEntity(new $info['targetEntity'], $row, $this->getItems($name, $items)));
+					call_user_func(array($entity, 'add' . $name), $row);
 				}
 
 				continue;
@@ -131,12 +206,19 @@ class Doctrine extends Nette\Object {
 				$entity->$name = new $info['targetEntity'];
 			}
 
+			if ($values[$name] instanceof $info['targetEntity']) {
+				$entity->$name = $values[$name];
+				continue;
+			}
+
 			if (!is_array($values[$name])) {
 				$entity->$name = NULL;
 				continue; // Exception?
 			}
 
-			$entity->$name = $this->buildEntity($entity->$name, $values[$name], $this->getItems($name, $items));
+			$this->path[] = $name;
+			$entity->$name = $this->buildEntity($entity->$name, $values[$name]);
+			array_pop($this->path);
 		}
 
 		return $entity;
@@ -146,79 +228,27 @@ class Doctrine extends Nette\Object {
 	 * Transform array to entity
 	 *
 	 * @param object|string $entity
-	 * @param array  $values
-	 * @param array  $items
+	 * @param array         $values
+	 * @param Settings      $settings
 	 * @return mixed
 	 */
-	public function toEntity($entity, array $values, array $items = array()) {
+	public function toEntity($entity, array $values, Settings $settings = NULL) {
 		if (!is_object($entity)) {
 			$entity = new $entity;
 		}
 
-		return $this->buildEntity($entity, $values, $this->parseItems($items));
+		$this->original = $values;
+		$this->path = array();
+		$this->settings = $settings ? : new Settings;
+
+		return $this->buildEntity($entity, $values);
 	}
 
 	/**
-	 * @param array $items
-	 * @return array
-	 */
-	private function parseItems(array $items) {
-		if (!$items) {
-			return array();
-		}
-
-		$result = array();
-		$isAll = TRUE;
-
-
-		foreach ($items as $name => $value) {
-			if (is_int($name)) {
-				if (!Nette\Utils\Strings::startsWith($value, '~')) {
-					$isAll = FALSE;
-				}
-
-				$result[$value] = '*';
-			} else {
-				if (!Nette\Utils\Strings::startsWith($name, '~')) {
-					$isAll = FALSE;
-				}
-
-				$result[$name] = is_array($value) ? $this->parseItems($value) : $value;
-			}
-		}
-
-		if ($isAll) {
-			$result['*'] = '*';
-		}
-
-		return $result;
-	}
-
-	/**
-	 * @param string     $name
-	 * @param array|bool $items
-	 * @param bool       $isAssociation
+	 * @param string $name
 	 * @return bool
 	 */
-	private function checkItem($name, $items, $isAssociation = FALSE) {
-		if (!$items) {
-			return TRUE;
-		}
-
-		// Exclude
-		if (array_key_exists('~' . $name, $items)) {
-			return FALSE;
-		}
-
-		// Allow all
-		if (array_key_exists('*', $items)) {
-			return TRUE;
-		}
-
-		if ($isAssociation) {
-			return array_key_exists($name, $items);
-		}
-
-		return array_key_exists($name, $items);
+	private function checkItem($name) {
+		return $this->settings->getAllowedItems($this->getPathName($name));
 	}
 }

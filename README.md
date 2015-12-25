@@ -58,18 +58,45 @@ public function afterSign(WebChemistry\Forms\Application\Form $form) {
 
 ```php
 public function export() {
-    $exclude = array(
-        '*', // Vybere všechny položky 
-        '~name', // Vynechá položku name
-        'cart' => array('~id') // Vynechá položku id v cart
-    );
+    $settings = new new WebChemistry\Forms\Doctrine\Settings();
+    $settings->setAllowedItems(array(
+       'name', // Vybere položku name,
+       'cart' => array('*'), // Vybere všechny položky v cart
+       'history' => array('id') // Vybere položku id v history
+    ));
+   
+    $this->doctrine->toArray($this->entity, $settings);
+}
+```
 
-    $this->doctrine->toArray($this->entity, $exclude);
+## Export jedné položky v join
+
+```php
+public function export() {
+    $settings = new new WebChemistry\Forms\Doctrine\Settings();
+    $settings->setJoinOneColumn(array(
+        'role' => 'id'
+    ));
+   
+    // Vytvoří pole === ['role' => 5]
+   
+    $this->doctrine->toArray($this->entity, $settings);
+}
+```
+
+## Vlstní callback k položkám
+
+```php
+public function export() {
+    $settings = new new WebChemistry\Forms\Doctrine\Settings();
+    $settings->setCallbacks(array(
+        'role' => function ($value, $baseEntity, &$continue) {
+            return ['id' => $value->id];
+        }
+    ));
     
-    $include = array(
-        'name', // Vybere položku name,
-        'cart' => array('*'), // Vybere všechny položky v cart
-        'history' => array('id') // Vybere položku id v history
-    );
+    // Vytvoří pole === ['role' => ['id' => 5]]
+   
+    $this->doctrine->toArray($this->entity, $settings);
 }
 ```

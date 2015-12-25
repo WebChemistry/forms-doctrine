@@ -117,6 +117,8 @@ class ArrayTest extends \PHPUnit_Framework_TestCase {
 	}
 
 	public function testBase() {
+		$settings = new \WebChemistry\Forms\Doctrine\Settings();
+
 		$this->checkObject($this->fillEntity(), $this->helper->toEntity('Entity\User', $this->fillArray()));
 	}
 
@@ -128,9 +130,10 @@ class ArrayTest extends \PHPUnit_Framework_TestCase {
 		$entity->count = NULL;
 		$entity->history = NULL;
 
-		$items = array('id', 'name', 'registration', 'role' => array('id'), 'cart' => '*');
+		$settings = new \WebChemistry\Forms\Doctrine\Settings();
+		$settings->setAllowedItems(array('id', 'name', 'registration', 'role' => array('id'), 'cart' => '*'));
 
-		$this->checkObject($entity, $this->helper->toEntity('Entity\User', $this->fillArray(), $items));
+		$this->checkObject($entity, $this->helper->toEntity('Entity\User', $this->fillArray(), $settings));
 	}
 
 	public function testManyToMany() {
@@ -142,43 +145,9 @@ class ArrayTest extends \PHPUnit_Framework_TestCase {
 		$entity->history = NULL;
 		$entity->clearCart();
 
-		$items = array('id', 'name', 'registration', 'role' => array('id'));
+		$settings = new \WebChemistry\Forms\Doctrine\Settings();
+		$settings->setAllowedItems(array('id', 'name', 'registration', 'role' => array('id')));
 
-		$this->checkObject($entity, $this->helper->toEntity('Entity\User', $this->fillArray(), $items));
-	}
-
-	public function testExclude() {
-		$entity = $this->fillEntity();
-
-		$entity->id = NULL;
-		$entity->role->id = NULL;
-		$entity->history = NULL;
-
-		$items = array('*', '~id', 'role' => array('~id'), '~history');
-
-		$this->checkObject($entity, $this->helper->toEntity('Entity\User', $this->fillArray(), $items));
-
-		// ManyToMany
-
-		$entity = $this->fillEntity();
-
-		$entity->id = NULL;
-		$entity->role->id = NULL;
-		$entity->history = NULL;
-		$entity->clearCart();
-
-		$cart = new \Entity\Cart();
-		$cart->name = 'Cart 1';
-
-		$entity->addCart($cart);
-
-		$cart = new \Entity\Cart();
-		$cart->name = 'Cart 2';
-
-		$entity->addCart($cart);
-
-		$items = array('*', '~id', 'role' => array('~id'), '~history', 'cart' => array('~id'));
-
-		$this->checkObject($entity, $this->helper->toEntity('Entity\User', $this->fillArray(), $items));
+		$this->checkObject($entity, $this->helper->toEntity('Entity\User', $this->fillArray(), $settings));
 	}
 }

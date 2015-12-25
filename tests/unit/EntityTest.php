@@ -103,9 +103,10 @@ class EntityTest extends \PHPUnit_Framework_TestCase {
 	}
 
 	public function testItems() {
-		$items = array(
-			'id', 'name', 'role' => array('id'), 'history' => '*', 'cart' => array('name')
-		);
+		$settings = new \WebChemistry\Forms\Doctrine\Settings();
+		$settings->setAllowedItems(array(
+			'id', 'name', 'role' => array('id'), 'history' => array('*'), 'cart' => array('name')
+		));
 
 		$this->assertSame(array(
 			'id' => 1,
@@ -125,15 +126,17 @@ class EntityTest extends \PHPUnit_Framework_TestCase {
 					'name' => 'Cart 2'
 				)
 			)
-		), $this->helper->toArray($this->fillEntity(), $items));
+		), $this->helper->toArray($this->fillEntity(), $settings));
 	}
 
 	public function testManyToMany() {
-		$items = array('name');
+		$settings = new \WebChemistry\Forms\Doctrine\Settings();
+		$settings->setAllowedItems(['name']);
 
-		$this->assertSame(array('name' => 'John'), $this->helper->toArray($this->fillEntity(), $items));
+		$this->assertSame(array('name' => 'John'), $this->helper->toArray($this->fillEntity(), $settings));
 
-		$items = array('cart' => '*');
+		$settings = new \WebChemistry\Forms\Doctrine\Settings();
+		$settings->setAllowedItems(['cart' => '*']);
 
 		$this->assertSame(array(
 			'cart' => array(
@@ -146,39 +149,30 @@ class EntityTest extends \PHPUnit_Framework_TestCase {
 					'name' => 'Cart 2'
 				)
 			)
-		), $this->helper->toArray($this->fillEntity(), $items));
+		), $this->helper->toArray($this->fillEntity(), $settings));
 	}
 
-	public function testExcludeItems() {
-		$items = array(
-			'*', '~history', '~cart', '~name', '~count', 'role' => array('~name')
-		);
-
-		$this->assertSame(array(
-			'id' => 1,
-			'password' => 'myPassword',
-			'registration' => NULL,
-			'role' => array(
-				'id' => 5
-			),
-			'voidClass' => NULL
-		), $this->helper->toArray($this->fillEntity(), $items));
+	public function testCallback() {
+		$settings = new \WebChemistry\Forms\Doctrine\Settings();
+		$settings->setAllowedItems(['name', 'role']);
+		$settings->setCallbacks([
+			'name' => function ($value, $entity) {
+				return 'myValue';
+			},
+			'role' => function ($value, $entity, &$continue) {
+				return 'myValue';
+			}
+		]);
+		$this->assertSame(['name' => 'myValue', 'role' => 'myValue'], $this->helper->toArray($this->fillEntity(), $settings));
 	}
 
-	public function testExcludeItemsManyToMany() {
-		$items = array(
-			'cart' => array('~id')
-		);
+	public function testJoinColumn() {
+		$settings = new \WebChemistry\Forms\Doctrine\Settings();
+		$settings->setJoinOneColumn([
+			'role' => 'id'
+		]);
+		$settings->setAllowedItems(['role' => ['*']]);
 
-		$this->assertSame(array(
-			'cart' => array(
-				0 => array(
-					'name' => 'Cart 1'
-				),
-				1 => array(
-					'name' => 'Cart 2'
-				)
-			)
-		), $this->helper->toArray($this->fillEntity(), $items));
+		$this->assertSame(['role' => 5], $this->helper->toArray($this->fillEntity(), $settings));
 	}
 }
