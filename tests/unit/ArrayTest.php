@@ -13,7 +13,13 @@ class ArrayTest extends \PHPUnit_Framework_TestCase {
 		$config->setProxyNamespace('Tests\_ProxyTests');
 		\Doctrine\Common\Annotations\AnnotationRegistry::registerFile(__DIR__ . '/../../vendor/doctrine/orm/lib/Doctrine/ORM/Mapping/Driver/DoctrineAnnotations.php');
 		$event = new \Doctrine\Common\EventManager();
-		$conn = new \Kdyby\Doctrine\Connection([], new \Doctrine\DBAL\Driver\PDOMySql\Driver(), $config, $event);
+		$conn = new \Kdyby\Doctrine\Connection(array(
+			'dbname' => 'test',
+			'user' => 'travis',
+			'password' => '',
+			'host' => 'localhost',
+			'driver' => 'pdo_mysql',
+		), new \Doctrine\DBAL\Driver\PDOMySql\Driver(), $config, $event);
 		$em = \Kdyby\Doctrine\EntityManager::create($conn, $config, $event);
 		$this->helper = new \WebChemistry\Forms\Doctrine($em);
 	}
