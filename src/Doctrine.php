@@ -18,7 +18,7 @@ class Doctrine extends Nette\Object {
 	/** @var Settings */
 	private $settings;
 
-	/** @var array|entity */
+	/** @var array|object */
 	private $original;
 
 	/**
@@ -29,10 +29,52 @@ class Doctrine extends Nette\Object {
 	}
 
 	/**
+	 * Transform entity to array
+	 *
+	 * @param object $entity
+	 * @param Settings|NULL $settings
+	 * @return array
+	 * @throws \Exception
+	 */
+	public function toArray($entity, Settings $settings = NULL) {
+		if (!is_object($entity)) {
+			throw new \Exception('Entity must be object.');
+		}
+
+		$this->original = $entity;
+		$this->path = array();
+		$this->settings = $settings ? : new Settings;
+
+		return $this->buildArray($entity);
+	}
+
+	/**
+	 * Transform array to entity
+	 *
+	 * @param object|string $entity
+	 * @param array $values
+	 * @param Settings $settings
+	 * @return mixed
+	 */
+	public function toEntity($entity, array $values, Settings $settings = NULL) {
+		if (!is_object($entity)) {
+			$entity = new $entity;
+		}
+
+		$this->original = $values;
+		$this->path = array();
+		$this->settings = $settings ? : new Settings;
+
+		return $this->buildEntity($entity, $values);
+	}
+
+	/************************* Builders **************************/
+
+	/**
 	 * @param object $entity
 	 * @return array
 	 */
-	private function buildArray($entity) {
+	protected function buildArray($entity) {
 		$meta = $this->em->getClassMetadata(get_class($entity));
 		$return = array();
 
@@ -48,15 +90,7 @@ class Doctrine extends Nette\Object {
 		}
 
 		foreach ($meta->getAssociationMappings() as $name => $info) {
-			if (!$this->checkItem($name)) {
-				continue;
-			}
-
-			if ($info['isOwningSide'] === FALSE) {
-				continue;
-			}
-
-			if (!isset($entity->$name)) {
+			if (!$this->checkItem($name) || $info['isOwningSide'] === FALSE || !isset($entity->$name)) {
 				continue;
 			}
 
@@ -64,14 +98,12 @@ class Doctrine extends Nette\Object {
 			if ($callback = $this->settings->getCallback($this->getPathName($name))) {
 				// Can be use as reference
 				$continue = FALSE;
-
 				$return[$name] = $callback($entity->$name, $this->original, $continue);
-
 				if (!$continue) {
 					continue;
 				}
 			}
-
+			// ManyToMany
 			if ($info['type'] === Doc\ORM\Mapping\ClassMetadata::MANY_TO_MANY) {
 				$return[$name] = array();
 
@@ -83,7 +115,7 @@ class Doctrine extends Nette\Object {
 
 				continue;
 			}
-
+			// Given value is not target entity
 			if (!$entity->$name instanceof $info['targetEntity']) {
 				if ($this->checkItem($name)) {
 					$return[$name] = NULL; // Empty entity
@@ -111,43 +143,14 @@ class Doctrine extends Nette\Object {
 	}
 
 	/**
-	 * @param string $name
-	 * @return string
-	 */
-	protected function getPathName($name) {
-		return implode('.', $this->path) . ($this->path ? '.' : '') . $name;
-	}
-
-	/**
-	 * Transform entity to array
-	 *
 	 * @param object $entity
-	 * @param array  $items
-	 * @param Settings $settings
-	 * @return array
-	 * @throws Exception
-	 */
-	public function toArray($entity, Settings $settings = NULL) {
-		if (!is_object($entity)) {
-			throw new \Exception('Entity must be object.');
-		}
-
-		$this->original = $entity;
-		$this->path = array();
-		$this->settings = $settings ? : new Settings;
-
-		return $this->buildArray($entity);
-	}
-
-	/**
-	 * @param object $entity
-	 * @param array  $values
-	 * @param array  $items
+	 * @param array $values
 	 * @return object
 	 */
-	public function buildEntity($entity, array $values) {
+	protected function buildEntity($entity, array $values) {
 		$meta = $this->em->getClassMetadata(get_class($entity));
 
+		// Normal items without associate
 		foreach ($meta->columnNames as $name => $void) {
 			if (array_key_exists($name, $values) && $this->checkItem($name)) {
 				// Custom callback
@@ -159,16 +162,9 @@ class Doctrine extends Nette\Object {
 			}
 		}
 
+		// associate
 		foreach ($meta->getAssociationMappings() as $name => $info) {
-			if (!$this->checkItem($name)) {
-				continue;
-			}
-
-			if ($info['isOwningSide'] === FALSE) {
-				continue;
-			}
-
-			if (!array_key_exists($name, $values)) {
+			if (!$this->checkItem($name) || $info['isOwningSide'] === FALSE || !array_key_exists($name, $values)) {
 				continue;
 			}
 
@@ -176,14 +172,12 @@ class Doctrine extends Nette\Object {
 			if ($callback = $this->settings->getCallback($this->getPathName($name))) {
 				// Can be use as reference
 				$continue = FALSE;
-
 				$return[$name] = $callback($values[$name], $this->original, $continue);
-
 				if (!$continue) {
 					continue;
 				}
 			}
-
+			// ManyToMany
 			if ($info['type'] === Doc\ORM\Mapping\ClassMetadata::MANY_TO_MANY) {
 				foreach ($values[$name] as $row) {
 					if (!$row instanceof $info['targetEntity']) {
@@ -201,19 +195,19 @@ class Doctrine extends Nette\Object {
 
 				continue;
 			}
-
+			// Target is null or other object
 			if (!$entity->$name instanceof $info['targetEntity']) {
 				$entity->$name = new $info['targetEntity'];
 			}
-
+			// Array contains entity of target
 			if ($values[$name] instanceof $info['targetEntity']) {
 				$entity->$name = $values[$name];
 				continue;
 			}
-
+			// Array contains NULL
 			if (!is_array($values[$name])) {
 				$entity->$name = NULL;
-				continue; // Exception?
+				continue;
 			}
 
 			$this->path[] = $name;
@@ -224,24 +218,14 @@ class Doctrine extends Nette\Object {
 		return $entity;
 	}
 
+	/************************* Helpers **************************/
+
 	/**
-	 * Transform array to entity
-	 *
-	 * @param object|string $entity
-	 * @param array         $values
-	 * @param Settings      $settings
-	 * @return mixed
+	 * @param string $name
+	 * @return string
 	 */
-	public function toEntity($entity, array $values, Settings $settings = NULL) {
-		if (!is_object($entity)) {
-			$entity = new $entity;
-		}
-
-		$this->original = $values;
-		$this->path = array();
-		$this->settings = $settings ? : new Settings;
-
-		return $this->buildEntity($entity, $values);
+	protected function getPathName($name) {
+		return implode('.', $this->path) . ($this->path ? '.' : '') . $name;
 	}
 
 	/**
@@ -251,4 +235,5 @@ class Doctrine extends Nette\Object {
 	private function checkItem($name) {
 		return $this->settings->getAllowedItems($this->getPathName($name));
 	}
+
 }
