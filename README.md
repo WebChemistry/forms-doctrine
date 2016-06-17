@@ -1,5 +1,7 @@
 # Rozšíření pro WebChemistry\Forms\Form
 
+[![Build Status](https://travis-ci.org/WebChemistry/Forms-Doctrine.svg?branch=master)](https://travis-ci.org/WebChemistry/Forms-Doctrine)
+
 ## Instalace
 
 **Composer**
