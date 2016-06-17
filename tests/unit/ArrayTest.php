@@ -6,7 +6,16 @@ class ArrayTest extends \PHPUnit_Framework_TestCase {
 	protected $helper;
 
 	protected function setUp() {
-		$this->helper = E::getByType('WebChemistry\Forms\Doctrine');
+		$config = new \Kdyby\Doctrine\Configuration();
+		$mapping = new \Doctrine\ORM\Mapping\Driver\AnnotationDriver(new \Doctrine\Common\Annotations\AnnotationReader(), [__DIR__ . '/entitites']);
+		$config->setMetadataDriverImpl($mapping);
+		$config->setProxyDir(__DIR__ . '/proxy');
+		$config->setProxyNamespace('Tests\_ProxyTests');
+		\Doctrine\Common\Annotations\AnnotationRegistry::registerFile(__DIR__ . '/../../vendor/doctrine/orm/lib/Doctrine/ORM/Mapping/Driver/DoctrineAnnotations.php');
+		$event = new \Doctrine\Common\EventManager();
+		$conn = new \Kdyby\Doctrine\Connection([], new \Doctrine\DBAL\Driver\PDOMySql\Driver(), $config, $event);
+		$em = \Kdyby\Doctrine\EntityManager::create($conn, $config, $event);
+		$this->helper = new \WebChemistry\Forms\Doctrine($em);
 	}
 
 	private function fillEntity() {
@@ -70,9 +79,6 @@ class ArrayTest extends \PHPUnit_Framework_TestCase {
 			),
 			'voidClass' => NULL
 		);
-	}
-
-	protected function tearDown() {
 	}
 
 	public function checkObject($expected, $actual) {

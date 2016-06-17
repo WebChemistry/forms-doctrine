@@ -6,10 +6,16 @@ class EntityTest extends \PHPUnit_Framework_TestCase {
 	protected $helper;
 
 	protected function setUp() {
-		$this->helper = E::getByType('WebChemistry\Forms\Doctrine');
-	}
-
-	protected function tearDown() {
+		$config = new \Kdyby\Doctrine\Configuration();
+		$mapping = new \Doctrine\ORM\Mapping\Driver\AnnotationDriver(new \Doctrine\Common\Annotations\AnnotationReader(), [__DIR__ . '/entitites']);
+		$config->setMetadataDriverImpl($mapping);
+		$config->setProxyDir(__DIR__ . '/proxy');
+		$config->setProxyNamespace('Tests\_ProxyTests');
+		\Doctrine\Common\Annotations\AnnotationRegistry::registerFile(__DIR__ . '/../../vendor/doctrine/orm/lib/Doctrine/ORM/Mapping/Driver/DoctrineAnnotations.php');
+		$event = new \Doctrine\Common\EventManager();
+		$conn = new \Kdyby\Doctrine\Connection([], new \Doctrine\DBAL\Driver\PDOMySql\Driver(), $config, $event);
+		$em = \Kdyby\Doctrine\EntityManager::create($conn, $config, $event);
+		$this->helper = new \WebChemistry\Forms\Doctrine($em);
 	}
 
 	private function fillArray() {
@@ -175,4 +181,5 @@ class EntityTest extends \PHPUnit_Framework_TestCase {
 
 		$this->assertSame(['role' => 5], $this->helper->toArray($this->fillEntity(), $settings));
 	}
+	
 }
