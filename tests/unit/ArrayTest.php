@@ -24,142 +24,133 @@ class ArrayTest extends \PHPUnit_Framework_TestCase {
 		$this->helper = new \WebChemistry\Forms\Doctrine($em);
 	}
 
-	private function fillEntity() {
-		$entity = new \Entity\User();
-		$entity->id = 1;
-		$entity->name = 'John';
-		$entity->password = 'myPassword';
-		$entity->count = 5;
-
-		$role = new \Entity\Role();
-		$role->id = 5;
-		$role->name = 'Owner';
-		//$role->addUser($entity);
-		$entity->role = $role;
-
-		$history = new \Entity\History;
-		$history->name = 'History';
-		//$history->user = $entity;
-		$entity->history = $history;
-
-		$cart = new \Entity\Cart();
-		$cart->name = 'Cart 1';
-		$entity->addCart($cart);
-		//$cart->addUser($entity);
-		//$entity->cart[] = $cart;
-
-		$cart = new \Entity\Cart();
-		$cart->id = 2;
-		$cart->name = 'Cart 2';
-		//$cart->addUser($entity);
-		$entity->addCart($cart);
-		//$entity->cart[] = $cart;
-
-		return $entity;
-	}
-
-	private function fillArray() {
-		return array(
-			'id' => 1,
-			'name' => 'John',
-			'password' => 'myPassword',
-			'registration' => NULL,
-			'count' => 5,
-			'role' => array(
-				'id' => 5,
-				'name' => 'Owner'
-			),
-			'history' => array(
-				'id' => NULL,
-				'name' => 'History'
-			),
-			'cart' => array(
-				0 => array(
-					'id' => NULL,
-					'name' => 'Cart 1'
-				),
-				1 => array(
-					'id' => 2,
-					'name' => 'Cart 2'
-				)
-			),
-			'voidClass' => NULL
-		);
-	}
-
-	public function checkObject($expected, $actual) {
-		foreach (array('id', 'name', 'voidClass', 'registration', 'password', 'count') as $row) {
-			$this->assertSame($expected->$row, $actual->$row, 'Base item ' . $row);
-		}
-
-		$exp = $expected->role;
-		$act = $actual->role;
-
-		if ($exp === NULL) {
-			$this->assertNull($act, 'Role is not NULL.');
-		} else {
-			foreach (array('id', 'name', 'users') as $row) {
-				$this->assertSame($exp->$row, $act->$row, 'Role item ' . $row);
-			}
-		}
-
-		$exp = $expected->history;
-		$act = $actual->history;
-
-		if ($exp === NULL) {
-			$this->assertNull($act, 'History is not NULL.');
-		} else {
-			foreach (array('id', 'name', 'user') as $row) {
-				$this->assertSame($exp->$row, $act->$row, 'History item ' . $row);
-			}
-		}
-
-		$exp = $expected->cart;
-		$act = $actual->cart;
-
-		if (!$exp) {
-			$this->assertEmpty($act, 'Cart is not empty.');
-		} else {
-			foreach ($expected->cart as $index => $row) {
-				foreach (array('name', 'id', 'users') as $column) {
-					$this->assertSame($row->$column, $act[$index]->$column, 'Cart item ' . $column);
-				}
-			}
-		}
-	}
-
 	public function testBase() {
-		$settings = new \WebChemistry\Forms\Doctrine\Settings();
+		$arr = [
+			'id' => 1,
+			'name' => 'foo',
+			'public' => 'bar'
+		];
 
-		$this->checkObject($this->fillEntity(), $this->helper->toEntity('Entity\User', $this->fillArray()));
+		/** @var \Tests\Role $entity */
+		$entity = $this->helper->toEntity('Tests\Role', $arr);
+
+		$this->assertInstanceOf('Tests\Role', $entity);
+		$this->assertSame(1, $entity->getId());
+		$this->assertSame('foo', $entity->getName());
+		$this->assertSame('bar', $entity->public);
+		$this->assertSame(0, $entity->getUsers()->count());
 	}
 
-	public function testItems() {
-		$entity = $this->fillEntity();
+	public function testSetEntity() {
+		$arr = [
+			'id' => 1,
+			'name' => 'foo'
+		];
 
-		$entity->password = NULL;
-		$entity->role->name = NULL;
-		$entity->count = NULL;
-		$entity->history = NULL;
+		$entity = new \Tests\Role();
+		$entity->public = 'bar';
+		$entity->setName('bar');
+		$entity = $this->helper->toEntity($entity, $arr);
 
-		$settings = new \WebChemistry\Forms\Doctrine\Settings();
-		$settings->setAllowedItems(array('id', 'name', 'registration', 'role' => array('id'), 'cart' => '*'));
+		$this->assertInstanceOf('Tests\Role', $entity);
+		$this->assertSame(1, $entity->getId());
+		$this->assertSame('foo', $entity->getName());
+		$this->assertSame('bar', $entity->public);
+		$this->assertSame(0, $entity->getUsers()->count());
+	}
+	
+	public function testSimpleAssociation() {
+		$arr = [
+			'id' => 1,
+			'role' => [
+				'name' => 'foo'
+			]
+		];
+		
+		/** @var \Tests\User $entity */
+		$entity = $this->helper->toEntity('Tests\User', $arr);
+		
+		$this->assertInstanceOf('Tests\User', $entity);
+		$this->assertSame(1, $entity->getId());
+		$this->assertInstanceOf('Tests\Role', $entity->getRole());
+		$this->assertSame('foo', $entity->getRole()->getName());
+		$this->assertNull($entity->getRole()->getId());
+		$this->assertNull($entity->getRole()->public);
+	}
 
-		$this->checkObject($entity, $this->helper->toEntity('Entity\User', $this->fillArray(), $settings));
+	public function testSimpleAssociationSetEntity() {
+		$arr = [
+			'id' => 1,
+			'role' => [
+				'name' => 'foo'
+			]
+		];
+
+		$entity = new \Tests\User();
+		$role = new \Tests\Role();
+		$role->setName('bar');
+		$role->public = 'foo';
+		$entity->setRole($role);
+
+		$entity = $this->helper->toEntity($entity, $arr);
+
+		$this->assertInstanceOf('Tests\User', $entity);
+		$this->assertSame(1, $entity->getId());
+		$this->assertInstanceOf('Tests\Role', $entity->getRole());
+		$this->assertSame('foo', $entity->getRole()->getName());
+		$this->assertNull($entity->getRole()->getId());
+		$this->assertSame('foo' , $entity->getRole()->public);
+	}
+
+	public function testOneToOne() {
+		$arr = [
+			'id' => 1,
+			'notice' => [
+				'id' => 1
+			]
+		];
+
+		$entity = $this->helper->toEntity('Tests\User', $arr);
+
+		$this->assertInstanceOf('Tests\Notice', $entity->getNotice());
+		$this->assertSame(1, $entity->getNotice()->getId());
 	}
 
 	public function testManyToMany() {
-		$entity = $this->fillEntity();
+		$arr = [
+			'id' => 1,
+			'items' => [
+				['id' => 1],
+				['id' => 2]
+			],
+		];
 
-		$entity->password = NULL;
-		$entity->role->name = NULL;
-		$entity->count = NULL;
-		$entity->history = NULL;
-		$entity->clearCart();
+		/** @var \Tests\User $entity */
+		$entity = $this->helper->toEntity('Tests\User', $arr);
 
-		$settings = new \WebChemistry\Forms\Doctrine\Settings();
-		$settings->setAllowedItems(array('id', 'name', 'registration', 'role' => array('id')));
-
-		$this->checkObject($entity, $this->helper->toEntity('Entity\User', $this->fillArray(), $settings));
+		$this->assertInstanceOf('Tests\User', $entity);
+		$this->assertSame(1, $entity->getId());
+		$this->assertSame(2, $entity->getItems()->count());
+		$this->assertSame(1, $entity->getItems()->get(0)->getId());
+		$this->assertSame(2, $entity->getItems()->get(1)->getId());
 	}
+	
+	public function testConstructor() {
+		$array = array(
+			'id' => 1,
+			'role' => array(
+				'id' => 1,
+				'name' => 'roleName'
+			),
+			'optionalName' => 'name'
+		);
+		$entity = $this->helper->toEntity('Tests\UserConstructor', $array);
+
+		$this->assertInstanceOf('Tests\UserConstructor', $entity);
+		$this->assertSame(1, $entity->getId());
+		$this->assertInstanceOf('Tests\Role', $entity->getRole());
+		$this->assertNull($entity->getOptionalRole());
+		$this->assertSame('name', $entity->getName()); // Default value in constructor
+	}
+	
 }

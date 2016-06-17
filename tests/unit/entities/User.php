@@ -1,76 +1,96 @@
 <?php
 
-namespace Entity;
+namespace Tests;
 
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\ORM\Mapping as ORM;
-use Kdyby\Doctrine\Entities\BaseEntity;
-use Kdyby\Doctrine\Entities\MagicAccessors;
 
 /**
- * @ORM\Entity
+ * @ORM\Entity()
  */
 class User {
 
-	use MagicAccessors;
-
-    /**
-     * @ORM\Id
-     * @ORM\Column(type="integer", length=9)
-     * @ORM\GeneratedValue
-     */
-    protected $id;
+	/**
+	 * @ORM\Id()
+	 * @ORM\Column(type="integer", length=11)
+	 * @ORM\GeneratedValue()
+	 */
+	private $id;
 
 	/**
-	 * @ORM\Column(type="string", length=15)
+	 * @ORM\ManyToMany(targetEntity="Tests\Item", inversedBy="users")
 	 */
-	protected $name;
+	private $items;
 
 	/**
-	 * @ORM\Column(type="string", length=50)
+	 * @ORM\ManyToOne(targetEntity="Tests\Role", inversedBy="users")
 	 */
-	protected $password;
+	private $role;
 
 	/**
-	 * @ORM\Column(type="datetime")
+	 * @ORM\OneToOne(targetEntity="Tests\Notice", inversedBy="user")
 	 */
-	protected $registration;
-
-	/**
-	 * @ORM\Column(type="integer", length=5)
-	 */
-	protected $count;
-
-	/**
-	 * @ORM\ManyToOne(targetEntity="Entity\Role", inversedBy="users", cascade={"persist"})
-	 */
-	protected $role;
-
-	/**
-	 * @ORM\OneToOne(targetEntity="Entity\History", inversedBy="user", cascade={"persist"})
-	 */
-	protected $history;
-
-	/**
-	 * @ORM\ManyToMany(targetEntity="Entity\Cart", inversedBy="users", cascade={"persist"})
-	 */
-	protected $cart;
-
-	/**
-	 * @ORM\OneToOne(targetEntity="Entity\VoidClass", inversedBy="user")
-	 */
-	protected $voidClass;
+	private $notice;
 
 	public function __construct() {
-		$this->cart = new ArrayCollection();
+		$this->items = new ArrayCollection();
 	}
 
-	public function addCart(Cart $cart) {
-		$this->cart->add($cart);
+	public function addItem(Item $item) {
+		$this->items->add($item);
+		$item->addUser($this);
 	}
 
-	public function clearCart() {
-		$this->cart->clear();
+	public function getItems() {
+		return $this->items;
+	}
+
+	/**
+	 * @return mixed
+	 */
+	public function getId() {
+		return $this->id;
+	}
+
+	/**
+	 * @param mixed $id
+	 * @return self
+	 */
+	public function setId($id) {
+		$this->id = $id;
+
+		return $this;
+	}
+
+	/**
+	 * @return Role
+	 */
+	public function getRole() {
+		return $this->role;
+	}
+
+	public function setRole($role) {
+		$this->role = $role;
+
+		return $this;
+	}
+
+	/**
+	 * @return mixed
+	 */
+	public function getNotice() {
+		return $this->notice;
+	}
+
+	/**
+	 * @param mixed $notice
+	 * @return self
+	 */
+	public function setNotice($notice) {
+		$this->notice = $notice;
+		$notice->setUser($this);
+
+		return $this;
 	}
 
 }

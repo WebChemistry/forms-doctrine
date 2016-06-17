@@ -6,31 +6,21 @@ use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\ORM\Mapping as ORM;
 
 /**
- * @ORM\Entity
+ * @ORM\Entity()
  */
-class Role {
+class Item {
 
 	/**
-	 * @ORM\Id
+	 * @ORM\Id()
 	 * @ORM\Column(type="integer", length=11)
-	 * @ORM\GeneratedValue
+	 * @ORM\GeneratedValue()
 	 */
 	protected $id;
 
 	/**
-	 * @ORM\Column(type="string", length=15)
+	 * @ORM\ManyToMany(targetEntity="Tests\User", mappedBy="items")
 	 */
-	protected $name;
-
-	/**
-	 * @ORM\OneToMany(targetEntity="Tests\User", mappedBy="role")
-	 */
-	protected $users;
-
-	/**
-	 * @ORM\Column(type="string", length=15)
-	 */
-	public $public;
+	private $users;
 
 	public function __construct() {
 		$this->users = new ArrayCollection();
@@ -38,28 +28,10 @@ class Role {
 
 	public function addUser(User $user) {
 		$this->users->add($user);
-		$user->setRole($this);
 	}
-	
+
 	public function getUsers() {
 		return $this->users;
-	}
-
-	/**
-	 * @return mixed
-	 */
-	public function getName() {
-		return $this->name;
-	}
-
-	/**
-	 * @param mixed $name
-	 * @return self
-	 */
-	public function setName($name) {
-		$this->name = $name;
-
-		return $this;
 	}
 
 	/**

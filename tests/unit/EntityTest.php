@@ -24,168 +24,71 @@ class EntityTest extends \PHPUnit_Framework_TestCase {
 		$this->helper = new \WebChemistry\Forms\Doctrine($em);
 	}
 
-	private function fillArray() {
-		return array(
-			'id' => 1,
-			'name' => 'John',
-			'password' => 'myPassword',
-			'registration' => NULL,
-			'count' => 5,
-			'role' => array(
-				'id' => 5,
-				'name' => 'Owner'
-			),
-			'history' => array(
-				'id' => NULL,
-				'name' => 'History'
-			),
-			'cart' => array(
-				0 => array(
-					'id' => NULL,
-					'name' => 'Cart 1'
-				),
-				1 => array(
-					'id' => 2,
-					'name' => 'Cart 2'
-				)
-			),
-			'voidClass' => NULL
-		);
-	}
-
-	private function fillEntity() {
-		$entity = new \Entity\User();
-		$entity->id = 1;
-		$entity->name = 'John';
-		$entity->password = 'myPassword';
-		$entity->count = 5;
-
-		$role = new \Entity\Role();
-		$role->id = 5;
-		$role->name = 'Owner';
-		$role->addUser($entity);
-		$entity->role = $role;
-
-		$history = new \Entity\History;
-		$history->name = 'History';
-		$history->user = $entity;
-		$entity->history = $history;
-
-		$cart = new \Entity\Cart();
-		$cart->name = 'Cart 1';
-		$cart->addUser($entity);
-
-		$cart = new \Entity\Cart();
-		$cart->id = 2;
-		$cart->name = 'Cart 2';
-		$cart->addUser($entity);
-
-		return $entity;
-	}
-
 	public function testBase() {
-		$entity = $this->fillEntity();
+		$role = new \Tests\Role();
+		$role->setId('id');
+		$role->setName('name');
 
-		$this->assertSame(array(
-			'id' => 1,
-			'name' => 'John',
-			'password' => 'myPassword',
-			'registration' => NULL,
-			'count' => 5,
-			'role' => array(
-				'id' => 5,
-				'name' => 'Owner'
-			),
-			'history' => array(
-				'id' => NULL,
-				'name' => 'History'
-			),
-			'cart' => array(
-				0 => array(
-					'id' => NULL,
-					'name' => 'Cart 1'
-				),
-				1 => array(
-					'id' => 2,
-					'name' => 'Cart 2'
-				)
-			),
-			'voidClass' => NULL
-		), $this->helper->toArray($entity));
+		$this->assertEquals([
+			'id' => 'id',
+			'name' => 'name',
+			'public' => NULL
+		], $this->helper->toArray($role));
 	}
 
-	public function testItems() {
-		$settings = new \WebChemistry\Forms\Doctrine\Settings();
-		$settings->setAllowedItems(array(
-			'id', 'name', 'role' => array('id'), 'history' => array('*'), 'cart' => array('name')
-		));
+	public function testAssociation() {
+		$user = new \Tests\User();
+		$user->setId(1);
+		$role = new \Tests\Role();
+		$role->setId(1);
+		$user->setRole($role);
 
-		$this->assertSame(array(
+		$this->assertEquals([
 			'id' => 1,
-			'name' => 'John',
-			'role' => array(
-				'id' => 5
-			),
-			'history' => array(
-				'id' => NULL,
-				'name' => 'History'
-			),
-			'cart' => array(
-				0 => array(
-					'name' => 'Cart 1'
-				),
-				1 => array(
-					'name' => 'Cart 2'
-				)
-			)
-		), $this->helper->toArray($this->fillEntity(), $settings));
+			'role' => [
+				'id' => 1,
+				'name' => NULL,
+				'public' => NULL
+			],
+			'items' => [],
+			'notice' => NULL
+		], $this->helper->toArray($user));
 	}
 
 	public function testManyToMany() {
-		$settings = new \WebChemistry\Forms\Doctrine\Settings();
-		$settings->setAllowedItems(['name']);
+		$user = new \Tests\User();
+		$item = new \Tests\Item();
+		$item->setId(1);
+		$user->addItem($item);
+		$item = new \Tests\Item();
+		$item->setId(2);
+		$user->addItem($item);
 
-		$this->assertSame(array('name' => 'John'), $this->helper->toArray($this->fillEntity(), $settings));
-
-		$settings = new \WebChemistry\Forms\Doctrine\Settings();
-		$settings->setAllowedItems(['cart' => '*']);
-
-		$this->assertSame(array(
-			'cart' => array(
-				0 => array(
-					'id' => NULL,
-					'name' => 'Cart 1'
-				),
-				1 => array(
-					'id' => 2,
-					'name' => 'Cart 2'
-				)
-			)
-		), $this->helper->toArray($this->fillEntity(), $settings));
+		$this->assertEquals([
+			'items' => [
+				['id' => 1],
+				['id' => 2]
+			],
+			'id' => NULL,
+			'role' => NULL,
+			'notice' => NULL
+		], $this->helper->toArray($user));
 	}
 
-	public function testCallback() {
-		$settings = new \WebChemistry\Forms\Doctrine\Settings();
-		$settings->setAllowedItems(['name', 'role']);
-		$settings->setCallbacks([
-			'name' => function ($value, $entity) {
-				return 'myValue';
-			},
-			'role' => function ($value, $entity, &$continue) {
-				return 'myValue';
-			}
-		]);
-		$this->assertSame(['name' => 'myValue', 'role' => 'myValue'], $this->helper->toArray($this->fillEntity(), $settings));
-	}
+	public function testOneToOne() {
+		$user = new \Tests\User();
+		$notice = new \Tests\Notice();
+		$notice->setId(1);
+		$user->setNotice($notice);
 
-	public function testJoinColumn() {
-		$settings = new \WebChemistry\Forms\Doctrine\Settings();
-		$settings->setJoinOneColumn([
-			'role' => 'id'
-		]);
-		$settings->setAllowedItems(['role' => ['*']]);
-
-		$this->assertSame(['role' => 5], $this->helper->toArray($this->fillEntity(), $settings));
+		$this->assertEquals([
+			'notice' => [
+				'id' => 1
+			],
+			'id' => NULL,
+			'items' => [],
+			'role' => NULL
+		], $this->helper->toArray($user));
 	}
 
 }
