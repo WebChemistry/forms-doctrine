@@ -57,15 +57,21 @@ class Doctrine extends Nette\Object {
 	 * @return mixed
 	 */
 	public function toEntity($entity, array $values, Settings $settings = NULL) {
+		$reflection = new \ReflectionClass($entity);
 		if (!is_object($entity)) {
-			$entity = new $entity;
+			$method = $reflection->getConstructor();
+			if (!$method || $method->getNumberOfRequiredParameters() === 0) {
+				$entity = new $entity;
+			} else {
+				$entity = new \stdClass();
+			}
 		}
 
 		$this->original = $values;
 		$this->path = array();
 		$this->settings = $settings ? : new Settings;
 
-		return $this->buildEntity($entity, $values);
+		return $this->buildEntity($entity, $reflection, $values);
 	}
 
 	/************************* Builders **************************/
@@ -82,23 +88,24 @@ class Doctrine extends Nette\Object {
 			if ($this->checkItem($name)) {
 				// Custom callback
 				if ($callback = $this->settings->getCallback($this->getPathName($name))) {
-					$return[$name] = $callback($entity->$name, $this->original);
+					$return[$name] = $callback($this->propertyGet($entity, $name), $this->original);
 				} else {
-					$return[$name] = $entity->$name;
+					$return[$name] = $this->propertyGet($entity, $name);
 				}
 			}
 		}
 
 		foreach ($meta->getAssociationMappings() as $name => $info) {
-			if (!$this->checkItem($name) || $info['isOwningSide'] === FALSE || !isset($entity->$name)) {
+			if (!$this->checkItem($name) || $info['isOwningSide'] === FALSE || !property_exists($entity, $name)) {
 				continue;
 			}
+			$propertyGet = $this->propertyGet($entity, $name);
 
 			// Custom callback
 			if ($callback = $this->settings->getCallback($this->getPathName($name))) {
 				// Can be use as reference
 				$continue = FALSE;
-				$return[$name] = $callback($entity->$name, $this->original, $continue);
+				$return[$name] = $callback($propertyGet, $this->original, $continue);
 				if (!$continue) {
 					continue;
 				}
@@ -106,8 +113,7 @@ class Doctrine extends Nette\Object {
 			// ManyToMany
 			if ($info['type'] === Doc\ORM\Mapping\ClassMetadata::MANY_TO_MANY) {
 				$return[$name] = array();
-
-				foreach ($entity->$name as $index => $row) {
+				foreach ($propertyGet as $index => $row) {
 					$this->path[] = $name;
 					$return[$name][$index] = $this->buildArray($row);
 					array_pop($this->path);
@@ -116,7 +122,7 @@ class Doctrine extends Nette\Object {
 				continue;
 			}
 			// Given value is not target entity
-			if (!$entity->$name instanceof $info['targetEntity']) {
+			if (!$propertyGet instanceof $info['targetEntity']) {
 				if ($this->checkItem($name)) {
 					$return[$name] = NULL; // Empty entity
 				}
@@ -126,16 +132,16 @@ class Doctrine extends Nette\Object {
 
 			if ($joinColumn = $this->settings->getJoinOneColumn($this->getPathName($name))) {
 				if (!is_callable($joinColumn)) {
-					$return[$name] = $entity->$name->$joinColumn;
+					$return[$name] = $propertyGet->$joinColumn;
 				} else {
-					$joinColumn($entity->$name, $return);
+					$joinColumn($propertyGet, $return);
 				}
 
 				continue;
 			}
 
 			$this->path[] = $name;
-			$return[$name] = $this->buildArray($entity->$name);
+			$return[$name] = $this->buildArray($propertyGet);
 			array_pop($this->path);
 		}
 
@@ -144,20 +150,24 @@ class Doctrine extends Nette\Object {
 
 	/**
 	 * @param object $entity
+	 * @param \ReflectionClass $reflection
 	 * @param array $values
+	 * @throws DoctrineException
 	 * @return object
 	 */
-	protected function buildEntity($entity, array $values) {
-		$meta = $this->em->getClassMetadata(get_class($entity));
+	protected function buildEntity($entity, $reflection, array $values) {
+		$className = $reflection->getName();
+		$meta = $this->em->getClassMetadata($className);
 
 		// Normal items without associate
 		foreach ($meta->columnNames as $name => $void) {
 			if (array_key_exists($name, $values) && $this->checkItem($name)) {
 				// Custom callback
-				if ($callback = $this->settings->getCallback($this->getPathName($name))) {
-					$entity->$name = $callback($values[$name], $this->original);
+				$callback = $this->settings->getCallback($this->getPathName($name));
+				if ($callback) {
+					$this->propertySet($entity, $name, $callback($values[$name], $this->original));
 				} else {
-					$entity->$name = $values[$name];
+					$this->propertySet($entity, $name, $values[$name]);
 				}
 			}
 		}
@@ -171,54 +181,140 @@ class Doctrine extends Nette\Object {
 			// Custom callback
 			if ($callback = $this->settings->getCallback($this->getPathName($name))) {
 				// Can be use as reference
-				$continue = FALSE;
-				$return[$name] = $callback($values[$name], $this->original, $continue);
-				if (!$continue) {
+				$continue = TRUE;
+				$this->propertySet($entity, $name, $callback($values[$name], $this->original, $continue));
+				if ($continue) {
 					continue;
 				}
 			}
 			// ManyToMany
 			if ($info['type'] === Doc\ORM\Mapping\ClassMetadata::MANY_TO_MANY) {
+				$arr = array();
 				foreach ($values[$name] as $row) {
 					if (!$row instanceof $info['targetEntity']) {
 						if (is_array($row)) {
+							$reflection = new \ReflectionClass($info['targetEntity']);
+							if ($reflection->getConstructor()->getNumberOfRequiredParameters() === 0) {
+								$obj = new $info['targetEntity'];
+							} else {
+								$obj = new \stdClass();
+							}
+
 							$this->path[] = $name;
-							$row = $this->buildEntity(new $info['targetEntity'], $row);
+							$row = $this->buildEntity($obj, $reflection, $row);
 							array_pop($this->path);
 						} else {
 							continue; // Exception?
 						}
 					}
 
-					call_user_func(array($entity, 'add' . $name), $row);
+					$arr[] = $row;
 				}
 
+				$this->propertySet($entity, $name, $arr);
 				continue;
-			}
-			// Target is null or other object
-			if (!$entity->$name instanceof $info['targetEntity']) {
-				$entity->$name = new $info['targetEntity'];
 			}
 			// Array contains entity of target
 			if ($values[$name] instanceof $info['targetEntity']) {
-				$entity->$name = $values[$name];
-				continue;
-			}
-			// Array contains NULL
-			if (!is_array($values[$name])) {
-				$entity->$name = NULL;
+				$this->propertySet($entity, $name, $values[$name]);
 				continue;
 			}
 
+			if (!is_array($values[$name])) {
+				$this->propertySet($entity, $name, NULL);
+				continue;
+			}
+			// Target is null or other object
+			$obj = $this->propertyGet($entity, $name);
+			if (!$obj instanceof $info['targetEntity']) {
+				$ref = new \ReflectionClass($info['targetEntity']);
+				$method = $ref->getConstructor();
+				if (!$method || $method->getNumberOfRequiredParameters() === 0) {
+					$obj = new $info['targetEntity'];
+				} else {
+					$obj = new \stdClass();
+				}
+			} else {
+				$ref = new \ReflectionClass($obj);
+			}
+
 			$this->path[] = $name;
-			$entity->$name = $this->buildEntity($entity->$name, $values[$name]);
+			$obj = $this->buildEntity($obj, $ref, $values[$name]);
+			$this->propertySet($entity, $name, $obj);
 			array_pop($this->path);
+		}
+
+		// Convert stdClass to entity class
+		if (!$entity instanceof $className) {
+			$args = array();
+			foreach ($reflection->getConstructor()->getParameters() as $param) {
+				$name = $param->getName();
+				if (!property_exists($entity, $name)) {
+					if (!$param->isOptional()) {
+						throw new DoctrineException("Required parameter '$name' not exists for '$className'.");
+					}
+					$args[] = $param->getDefaultValue();
+					continue;
+				}
+
+				$args[] = $entity->$name;
+				unset($entity->$name);
+			}
+
+			$std = $entity;
+			$entity = $reflection->newInstanceArgs($args);
+
+			foreach ($std as $key => $value) {
+				$this->propertySet($entity, $key, $value);
+			}
 		}
 
 		return $entity;
 	}
 
 	/************************* Helpers **************************/
+
+	private function propertyGet($class, $name) {
+		$getter = 'get' . ucfirst($name);
+		if (!$class instanceof \stdClass && method_exists($class, $getter)) {
+			return call_user_func(array($class, $getter));
+		}
+
+		return isset($class->$name) ? $class->$name : NULL;
+	}
+
+	private function propertySet($class, $name, $value) {
+		if ($class instanceof \stdClass) {
+			$class->$name = $value;
+			
+			return TRUE;
+		}
+
+		$setter = 'set' . ucfirst($name);
+		if (method_exists($class, $setter)) {
+			call_user_func(array($class, $setter), $value);
+			
+			return TRUE;
+		}
+		if (is_array($value)) { // adder
+			$adder = 'add' . ucfirst($name);
+			for ($i = 0; $i < 3; $i++) { // Plural version with s, es
+				if (method_exists($class, $adder)) {
+					foreach ($value as $item) {
+						call_user_func(array($class, $adder), $item);
+					}
+
+					return TRUE;
+				}
+				$adder = substr($adder, 0, -1);
+			}
+		}
+		if (property_exists($class, $name)) {
+			$class->$name = $value;
+		} else {
+			return FALSE;
+		}
+	}
 
 	/**
 	 * @param string $name
