@@ -1,6 +1,6 @@
 <?php
 
-class ArrayTest extends \PHPUnit_Framework_TestCase {
+class ToEntityTest extends \PHPUnit_Framework_TestCase {
 
 	/** @var \WebChemistry\Forms\Doctrine */
 	protected $helper;
