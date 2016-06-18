@@ -17,6 +17,7 @@ class Settings extends Object {
 	protected $callbacks = array();
 
 	/**
+	 * @param string $name
 	 * @return string|NULL
 	 */
 	public function getJoinOneColumn($name) {
@@ -36,6 +37,8 @@ class Settings extends Object {
 	}
 
 	/**
+	 * @param string $name
+	 * @param array $prev
 	 * @return array
 	 */
 	public function getAllowedItems($name, array $prev = NULL) {

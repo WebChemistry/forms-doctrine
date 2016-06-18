@@ -18,6 +18,11 @@ class Item {
 	protected $id;
 
 	/**
+	 * @ORM\Column(type="name")
+	 */
+	protected $name;
+
+	/**
 	 * @ORM\ManyToMany(targetEntity="Tests\User", mappedBy="items")
 	 */
 	private $users;

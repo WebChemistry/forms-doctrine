@@ -132,7 +132,7 @@ class Doctrine extends Nette\Object {
 
 			if ($joinColumn = $this->settings->getJoinOneColumn($this->getPathName($name))) {
 				if (!is_callable($joinColumn)) {
-					$return[$name] = $propertyGet->$joinColumn;
+					$return[$name] = $this->propertyGet($propertyGet, $joinColumn);
 				} else {
 					$joinColumn($propertyGet, $return);
 				}

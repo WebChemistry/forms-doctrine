@@ -66,8 +66,8 @@ class EntityTest extends \PHPUnit_Framework_TestCase {
 
 		$this->assertEquals([
 			'items' => [
-				['id' => 1],
-				['id' => 2]
+				['id' => 1, 'name' => NULL],
+				['id' => 2, 'name' => NULL]
 			],
 			'id' => NULL,
 			'role' => NULL,
@@ -89,6 +89,74 @@ class EntityTest extends \PHPUnit_Framework_TestCase {
 			'items' => [],
 			'role' => NULL
 		], $this->helper->toArray($user));
+	}
+
+	public function testCallback() {
+		$user = new \Tests\User();
+		$role = new \Tests\Role();
+		$role->setId(1);
+		$role->setName('foo');
+		$user->setRole($role);
+
+		$settings = new \WebChemistry\Forms\Doctrine\Settings();
+		$settings->setCallbacks([
+			'role' => function ($value, $entity) {
+				return ['id' => $value->getId()];
+			}
+		]);
+		$this->assertEquals([
+			'id' => NULL,
+			'items' => [],
+			'role' => [
+				'id' => 1
+			],
+			'notice' => NULL
+		], $this->helper->toArray($user, $settings));
+	}
+
+	public function testJoinColumn() {
+		$user = new \Tests\User();
+		$role = new \Tests\Role();
+		$role->setId(1);
+		$role->setName('foo');
+		$user->setRole($role);
+
+		$settings = new \WebChemistry\Forms\Doctrine\Settings();
+		$settings->setJoinOneColumn([
+			'role' => 'id'
+		]);
+		$this->assertEquals([
+			'id' => NULL,
+			'items' => [],
+			'role' => 1,
+			'notice' => NULL
+		], $this->helper->toArray($user, $settings));
+	}
+
+	public function testAllowedItems() {
+		$user = new \Tests\User();
+		$user->setId(10);
+		$role = new \Tests\Role();
+		$role->setId(1);
+		$role->setName('foo');
+		$user->setRole($role);
+		$item = new \Tests\Item();
+		$item->setId(20);
+		$user->addItem($item);
+
+		$settings = new \WebChemistry\Forms\Doctrine\Settings();
+		$settings->setAllowedItems([
+			'id',
+			'role' => ['id'],
+			'items' => ['id']
+		]);
+		$this->assertEquals([
+			'id' => 10,
+			'role' => ['id' => 1],
+			'items' => [
+				['id' => 20]
+			]
+		], $this->helper->toArray($user, $settings));
 	}
 
 }
