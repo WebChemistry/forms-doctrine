@@ -11,7 +11,9 @@
 	],
 	"require": {
 		"nette/di": "^2.3",
-		"kdyby/doctrine": ">=2.3",
+		"kdyby/doctrine": ">=2.3"
+	},
+	"require-dev": {
 		"codeception/codeception": "^2.2"
 	},
 	"autoload": {
