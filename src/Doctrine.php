@@ -52,11 +52,11 @@ class Doctrine extends Nette\Object {
 	 * Transform array to entity
 	 *
 	 * @param object|string $entity
-	 * @param array $values
+	 * @param array|\Traversable $values
 	 * @param Settings $settings
 	 * @return mixed
 	 */
-	public function toEntity($entity, array $values, Settings $settings = NULL) {
+	public function toEntity($entity, $values, Settings $settings = NULL) {
 		$reflection = new \ReflectionClass($entity);
 		if (!is_object($entity)) {
 			$method = $reflection->getConstructor();
@@ -65,6 +65,9 @@ class Doctrine extends Nette\Object {
 			} else {
 				$entity = new \stdClass();
 			}
+		}
+		if ($values instanceof \Traversable) {
+			$values = $this->recursiveIteratorToArray($values);
 		}
 
 		$this->original = $values;
@@ -288,6 +291,22 @@ class Doctrine extends Nette\Object {
 	}
 
 	/************************* Helpers **************************/
+
+	/**
+	 * @param \Traversable $traversable
+	 * @return array
+	 */
+	private function recursiveIteratorToArray(\Traversable $traversable) {
+		$array = array();
+		foreach ($traversable as $item => $value) {
+			if ($value instanceof \Traversable) {
+				$value = $this->recursiveIteratorToArray($value);
+			}
+			$array[$item] = $value;
+		}
+
+		return $array;
+	}
 
 	private function propertyGet($class, $name) {
 		$getter = 'get' . ucfirst($name);

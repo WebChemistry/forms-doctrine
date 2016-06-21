@@ -182,4 +182,20 @@ class ToEntityTest extends \PHPUnit_Framework_TestCase {
 		}
 	}
 	
+	public function testIteratorToArray() {
+		$arr = [
+			'id' => 1,
+			'name' => 'foo',
+			'role' => [
+				'id' => 1
+			]
+		];
+		$arr = \Nette\Utils\ArrayHash::from($arr);
+
+		$entity = $this->helper->toEntity('Tests\User', $arr);
+		
+		$this->assertSame(1, $entity->getId());
+		$this->assertSame(1, $entity->getRole()->getId());
+	}
+
 }
