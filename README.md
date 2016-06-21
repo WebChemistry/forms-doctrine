@@ -1,6 +1,6 @@
 # Entity to array and conversely
 
-[![Build Status](https://travis-ci.org/WebChemistry/Forms-Doctrine.svg?branch=master)](https://travis-ci.org/WebChemistry/Forms-Doctrine)
+[![Build Status](https://travis-ci.org/WebChemistry/forms-doctrine.svg?branch=master)](https://travis-ci.org/WebChemistry/forms-doctrine)
 
 ## Installation
 
