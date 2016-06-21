@@ -15,7 +15,7 @@ class DoctrineExtension extends CompilerExtension {
 		$builder = $this->getContainerBuilder();
 
 		$builder->addDefinition($this->prefix('doctrine'))
-				->setClass('WebChemistry\Forms\Doctrine');
+			->setClass('WebChemistry\Forms\Doctrine');
 	}
 
 }

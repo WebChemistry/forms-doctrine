@@ -69,7 +69,7 @@ class Doctrine extends Nette\Object {
 
 		$this->original = $values;
 		$this->path = array();
-		$this->settings = $settings ? : new Settings;
+		$this->settings = $settings ?: new Settings;
 
 		return $this->buildEntity($entity, $reflection, $values);
 	}
