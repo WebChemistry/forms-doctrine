@@ -174,6 +174,19 @@ public function export() {
 }
 ```
 
+## Auto-find by ID
+
+```php
+public function export() {
+    $settings = new new WebChemistry\Forms\Doctrine\Settings();
+    $settings->setFind([
+        'role' => 10 // Uses method find from repository
+    ]);
+
+    $this->doctrine->toArray($this->entity, $settings);
+}
+```
+
 ## Usage in forms
 
 ```php
