@@ -203,6 +203,13 @@ class Doctrine extends Nette\Object {
 							$this->path[] = $name;
 							$row = $this->buildEntity($obj, $reflection, $row);
 							array_pop($this->path);
+
+						} else if ($this->isInFind($name)) { // Find by id
+							$row = $this->em->getRepository($info['targetEntity'])->find($row);
+							if (!$row) {
+								continue;
+							}
+
 						} else {
 							continue; // Exception?
 						}
@@ -212,6 +219,14 @@ class Doctrine extends Nette\Object {
 				}
 
 				$this->propertySet($entity, $name, $arr);
+				continue;
+			}
+			// Find by id
+			if ($this->isInFind($name)) {
+				if ($values[$name] !== NULL) {
+					$row = $this->em->getRepository($info['targetEntity'])->find($values[$name]);
+					$this->propertySet($entity, $name, $row);
+				}
 				continue;
 			}
 			// Array contains entity of target
@@ -330,6 +345,14 @@ class Doctrine extends Nette\Object {
 	 */
 	private function checkItem($name) {
 		return $this->settings->getAllowedItems($this->getPathName($name));
+	}
+
+	/**
+	 * @param string $name
+	 * @return bool
+	 */
+	private function isInFind($name) {
+		return $this->settings->isInFind($this->getPathName($name));
 	}
 
 }

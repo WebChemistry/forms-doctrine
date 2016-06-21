@@ -16,6 +16,9 @@ class Settings extends Object {
 	/** @var array item => callback */
 	protected $callbacks = array();
 
+	/** @var array */
+	protected $find = [];
+
 	/**
 	 * @param string $name
 	 * @return string|NULL
@@ -100,6 +103,24 @@ class Settings extends Object {
 	 */
 	public function getCallback($item) {
 		return isset($this->callbacks[$item]) ? Callback::check($this->callbacks[$item]) : NULL;
+	}
+
+	/**
+	 * @param array $items
+	 * @return self
+	 */
+	public function setFind(array $items) {
+		$this->find = $items;
+
+		return $this;
+	}
+
+	/**
+	 * @param string $name
+	 * @return boolean
+	 */
+	public function isInFind($name) {
+		return array_search($name, $this->find) !== FALSE;
 	}
 
 }

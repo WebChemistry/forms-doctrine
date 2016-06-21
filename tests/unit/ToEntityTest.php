@@ -8,6 +8,7 @@ class ToEntityTest extends \PHPUnit_Framework_TestCase {
 	protected function setUp() {
 		$config = new \Kdyby\Doctrine\Configuration();
 		$mapping = new \Doctrine\ORM\Mapping\Driver\AnnotationDriver(new \Doctrine\Common\Annotations\AnnotationReader(), [__DIR__ . '/entitites']);
+		$config->setDefaultRepositoryClassName('Tests\DefaultRepository');
 		$config->setMetadataDriverImpl($mapping);
 		$config->setProxyDir(__DIR__ . '/proxy');
 		$config->setProxyNamespace('Tests\_ProxyTests');
@@ -151,6 +152,34 @@ class ToEntityTest extends \PHPUnit_Framework_TestCase {
 		$this->assertInstanceOf('Tests\Role', $entity->getRole());
 		$this->assertNull($entity->getOptionalRole());
 		$this->assertSame('name', $entity->getName()); // Default value in constructor
+	}
+
+	public function testFind() {
+		$array = array(
+			'id' => 1,
+			'role' => 1,
+			'items' => [
+				1, 2, 3
+			]
+		);
+
+		$settings = new \WebChemistry\Forms\Doctrine\Settings();
+		$settings->setFind(array(
+			'role', 'items'
+		));
+		/** @var \Tests\User $entity */
+		$entity = $this->helper->toEntity('Tests\User', $array, $settings);
+
+		$this->assertEquals([
+			'Tests\Role' => [ 1 ],
+			'Tests\Item' => [ 1, 2, 3]
+		], \Tests\DefaultRepository::$find);
+		$this->assertNotNull($entity->getRole());
+		$this->assertInstanceOf('Tests\Role', $entity->getRole());
+		$this->assertSame(3, $entity->getItems()->count());
+		foreach ($entity->getItems() as $item) {
+			$this->assertInstanceOf('Tests\Item', $item);
+		}
 	}
 	
 }
