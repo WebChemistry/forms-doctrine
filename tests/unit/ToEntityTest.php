@@ -42,6 +42,22 @@ class ToEntityTest extends \PHPUnit_Framework_TestCase {
 		$this->assertSame(0, $entity->getUsers()->count());
 	}
 
+	public function testNotExistsItems() {
+		$arr = [
+			'foo' => 'foo',
+			'bar' => ['foo'],
+			'items' => [ 'foo' ],
+			'role' => [
+				'foo' => 'foo'
+			]
+		];
+
+		$entity = $this->helper->toEntity('Tests\User', $arr);
+
+		$this->assertSame(0, $entity->getItems()->count());
+		$this->assertInstanceOf('Tests\Role', $entity->getRole());
+	}
+
 	public function testSetEntity() {
 		$arr = [
 			'id' => 1,
