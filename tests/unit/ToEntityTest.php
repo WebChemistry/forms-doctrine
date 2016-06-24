@@ -150,6 +150,22 @@ class ToEntityTest extends \PHPUnit_Framework_TestCase {
 		$this->assertSame(2, $entity->getItems()->count());
 		$this->assertSame(1, $entity->getItems()->get(0)->getId());
 		$this->assertSame(2, $entity->getItems()->get(1)->getId());
+
+		$arr = [
+			'id' => 1,
+			'items' => [
+				$item = new \Tests\Item(),
+				['id' => 2]
+			],
+		];
+
+		/** @var \Tests\User $entity */
+		$entity = $this->helper->toEntity('Tests\User', $arr);
+
+		$this->assertInstanceOf('Tests\User', $entity);
+		$this->assertSame(2, $entity->getItems()->count());
+		$this->assertSame($item, $entity->getItems()->get(0));
+		$this->assertSame(2, $entity->getItems()->get(1)->getId());
 	}
 	
 	public function testConstructor() {
