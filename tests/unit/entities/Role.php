@@ -23,7 +23,7 @@ class Role {
 	protected $name;
 
 	/**
-	 * @ORM\OneToMany(targetEntity="Tests\User", mappedBy="role")
+	 * @ORM\OneToMany(targetEntity="Tests\User", mappedBy="role", cascade={"persist"})
 	 */
 	protected $users;
 

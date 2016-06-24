@@ -177,7 +177,10 @@ class Doctrine extends Nette\Object {
 
 		// associate
 		foreach ($meta->getAssociationMappings() as $name => $info) {
-			if (!$this->checkItem($name) || $info['isOwningSide'] === FALSE || !array_key_exists($name, $values)) {
+			if (!$this->checkItem($name) || !array_key_exists($name, $values)) {
+				continue;
+			}
+			if ($info['isOwningSide'] === FALSE && !in_array('persist', $info['cascade'])) {
 				continue;
 			}
 
@@ -190,8 +193,11 @@ class Doctrine extends Nette\Object {
 					continue;
 				}
 			}
-			// ManyToMany
-			if ($info['type'] === Doc\ORM\Mapping\ClassMetadata::MANY_TO_MANY) {
+			// ManyToMany & cascade
+			if ($info['type'] === Doc\ORM\Mapping\ClassMetadata::MANY_TO_MANY || $info['isOwningSide'] === FALSE) {
+				if (!is_array($values[$name])) {
+					continue;
+				}
 				$arr = array();
 				foreach ($values[$name] as $row) {
 					if (!$row instanceof $info['targetEntity']) {

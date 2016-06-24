@@ -214,4 +214,18 @@ class ToEntityTest extends \PHPUnit_Framework_TestCase {
 		$this->assertSame(1, $entity->getRole()->getId());
 	}
 
+	public function testCascade() {
+		$arr = [
+			'users' => [
+				['id' => 1],
+				['id' => 2]
+			]
+		];
+
+		$entity = $this->helper->toEntity('Tests\Role', $arr);
+		$this->assertSame(2, $entity->getUsers()->count());
+		$this->assertSame(1, $entity->getUsers()[0]->getId());
+		$this->assertSame(2, $entity->getUsers()[1]->getId());
+	}
+
 }
