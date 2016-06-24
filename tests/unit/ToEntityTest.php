@@ -214,6 +214,14 @@ class ToEntityTest extends \PHPUnit_Framework_TestCase {
 		/** @var \Tests\User $entity */
 		$entity = $this->helper->toEntity('Tests\User', $array, $settings);
 		$this->assertSame(10, $entity->getRole()->getId());
+
+		$array = [
+			'role' => NULL
+		];
+
+		/** @var \Tests\User $entity */
+		$entity = $this->helper->toEntity('Tests\User', $array, $settings);
+		$this->assertNull($entity->getRole());
 	}
 	
 	public function testIteratorToArray() {
