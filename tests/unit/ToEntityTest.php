@@ -196,6 +196,24 @@ class ToEntityTest extends \PHPUnit_Framework_TestCase {
 		foreach ($entity->getItems() as $item) {
 			$this->assertInstanceOf('Tests\Item', $item);
 		}
+
+		$array = [
+			'role' => $role = new \Tests\Role()
+		];
+
+		/** @var \Tests\User $entity */
+		$entity = $this->helper->toEntity('Tests\User', $array, $settings);
+		$this->assertSame($role, $entity->getRole());
+
+		$array = [
+			'role' => [
+				'id' => 10
+			]
+		];
+
+		/** @var \Tests\User $entity */
+		$entity = $this->helper->toEntity('Tests\User', $array, $settings);
+		$this->assertSame(10, $entity->getRole()->getId());
 	}
 	
 	public function testIteratorToArray() {

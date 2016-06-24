@@ -230,14 +230,6 @@ class Doctrine extends Nette\Object {
 				$this->propertySet($entity, $name, $arr);
 				continue;
 			}
-			// Find by id
-			if ($this->isInFind($name)) {
-				if ($values[$name] !== NULL) {
-					$row = $this->em->getRepository($info['targetEntity'])->find($values[$name]);
-					$this->propertySet($entity, $name, $row);
-				}
-				continue;
-			}
 			// Array contains entity of target
 			if ($values[$name] instanceof $info['targetEntity']) {
 				$this->propertySet($entity, $name, $values[$name]);
@@ -245,7 +237,15 @@ class Doctrine extends Nette\Object {
 			}
 
 			if (!is_array($values[$name])) {
-				$this->propertySet($entity, $name, NULL);
+				$val = NULL;
+				// Find by id
+				if ($this->isInFind($name)) {
+					if ($values[$name] !== NULL) {
+						$val = $this->em->getRepository($info['targetEntity'])->find($values[$name]);
+					}
+				}
+
+				$this->propertySet($entity, $name, $val);
 				continue;
 			}
 			// Target is null or other object
