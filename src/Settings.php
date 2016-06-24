@@ -31,7 +31,7 @@ class Settings extends Object {
 
 	/**
 	 * @param array $joinColumn
-	 * @return Settings
+	 * @return self
 	 */
 	public function setJoinOneColumn(array $joinColumn) {
 		$this->joinColumn = $joinColumn;
@@ -80,7 +80,7 @@ class Settings extends Object {
 
 	/**
 	 * @param array $allowedItems
-	 * @return Settings
+	 * @return self
 	 */
 	public function setAllowedItems(array $allowedItems) {
 		$this->allowedItems = $allowedItems;
@@ -90,7 +90,7 @@ class Settings extends Object {
 
 	/**
 	 * @param array $callbacks
-	 * @return Settings
+	 * @return self
 	 */
 	public function setCallbacks(array $callbacks) {
 		$this->callbacks = $callbacks;
@@ -117,7 +117,7 @@ class Settings extends Object {
 
 	/**
 	 * @param string $name
-	 * @return boolean
+	 * @return bool
 	 */
 	public function isInFind($name) {
 		return array_search($name, $this->find) !== FALSE;
