@@ -189,14 +189,15 @@ public function export() {
 
 ## Usage in forms
 
+We must install [webchemistry/forms]:(https://github.com/WebChemistry/forms)
+
 ```php
 
-/** @var WebChemistry\Forms\Doctrine @inject */
-public $doctrine;
+/** @var WebChemistry\Forms\Factory\FormFactory @inject */
+public $factory;
 
 protected function createComponentForm() {
-    $form = new WebChemistry\Forms\Form(); // For easier usage
-    $form->setDoctrine($this->doctrine);
+    $form = $this->factory->create();
     
     $form->addText('name', 'User name')
          ->setRequired();
