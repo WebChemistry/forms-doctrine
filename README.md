@@ -189,7 +189,7 @@ public function export() {
 
 ## Usage in forms
 
-We must install [webchemistry/forms]:(https://github.com/WebChemistry/forms)
+We must install [webchemistry/forms](https://github.com/WebChemistry/forms)
 
 ```php
 
