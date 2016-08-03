@@ -187,17 +187,65 @@ public function export() {
 }
 ```
 
-## Usage in forms
+## Usage in doctrine repository
 
-We must install [webchemistry/forms](https://github.com/WebChemistry/forms)
+Change BaseRepository:
 
 ```php
 
-/** @var WebChemistry\Forms\Factory\FormFactory @inject */
-public $factory;
+class BaseRepository {
+
+    use WebChemistry\Forms\Doctrine\TBaseRepository;
+
+}
+
+```
+
+and using:
+
+```php
+
+class UserRepository {
+
+    /**
+     * @return Entity\User
+     */
+    public function toEntity(array $values, Entity\User $defaultEntity = NULL) {
+        $settings = new WebChemistry\Forms\Doctrine\Settings();
+        // ...
+        
+        return $this->convertToEntity($values, $defaultEntity, $settings);
+    }
+    
+    /**
+     * @return array
+     */
+    public function toArray(Entity\User $entity) {
+        $settings = new new WebChemistry\Forms\Doctrine\Settings();
+        // ...
+        
+        return $this->convertToArray($entity, $settings);
+    }
+    
+    public function save(array $values) {
+        $this->_em->persist($this->toEntity($values));
+        $this->_em->flush();
+    }
+    
+}
+
+```
+
+## Usage in forms
+
+```php
+
+/** @var WebChemistry\Forms\Doctrine @inject */
+public $doctrine;
 
 protected function createComponentForm() {
-    $form = $this->factory->create();
+    $form = new WebChemistry\Forms\Form(); // For easier usage
+    $form->setDoctrine($this->doctrine);
     
     $form->addText('name', 'User name')
          ->setRequired();
@@ -220,4 +268,3 @@ public function afterSign(WebChemistry\Forms\Application\Form $form) {
 }
 
 ```
-
