@@ -2,12 +2,13 @@
 
 namespace WebChemistry\Forms;
 
-use Nette;
-
 use Doctrine as Doc;
+use Nette\SmartObject;
 use WebChemistry\Forms\Doctrine\Settings;
 
-class Doctrine extends Nette\Object {
+class Doctrine {
+
+	use SmartObject;
 
 	/** @var Doc\ORM\EntityManager */
 	private $em;
