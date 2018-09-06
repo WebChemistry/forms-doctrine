@@ -2,10 +2,12 @@
 
 namespace WebChemistry\Forms\Doctrine;
 
-use Nette\Object;
+use Nette\SmartObject;
 use Nette\Utils\Callback;
 
-class Settings extends Object {
+class Settings {
+
+	use SmartObject;
 
 	/** @var array */
 	protected $joinColumn = array();
