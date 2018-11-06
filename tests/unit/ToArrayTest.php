@@ -1,6 +1,6 @@
 <?php
 
-class ToArrayTest extends \PHPUnit_Framework_TestCase {
+class ToArrayTest extends \PHPUnit\Framework\TestCase {
 
 	/** @var \WebChemistry\Forms\Doctrine */
 	protected $helper;
