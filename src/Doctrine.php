@@ -343,15 +343,15 @@ class Doctrine {
 			return TRUE;
 		}
 		if (is_array($value)) { // adder
-		    $items = call_user_func(array($class, 'get' . ucfirst($name)));
-		    $removed = array();
-		    foreach ($items as $item) { // cleanup
-		        if (! in_array($item, $value, true)) {
-		            $removed[] = $item;
-		        }
-		    }
+			$items = call_user_func(array($class, 'get' . ucfirst($name)));
+			$removed = array();
+			foreach ($items as $item) { // cleanup
+				if (! in_array($item, $value, true)) {
+					$removed[] = $item;
+				}
+			}
 			$adder = 'add' . ucfirst($name);
-		    $remover = 'remove' . ucfirst($name);
+			$remover = 'remove' . ucfirst($name);
 			for ($i = 0; $i < 3; $i++) { // Plural version with s, es
 				if (method_exists($class, $remover)) {
 					foreach ($removed as $item) {
