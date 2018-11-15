@@ -204,10 +204,10 @@ class Doctrine {
 					if (!$row instanceof $info['targetEntity']) {
 						if (is_array($row)) {
 							$reflection = new \ReflectionClass($info['targetEntity']);
-							if ($this->isInFind($name)) {
-								$idName = $this->em
-									->getClassMetadata($info['targetEntity'])
-									->getSingleIdentifierFieldName();
+							$idName = $this->em
+								->getClassMetadata($info['targetEntity'])
+								->getSingleIdentifierFieldName();
+							if (!empty($row[$idName]) && $this->isInFind($name)) {
 								$obj = $this->em->getRepository($info['targetEntity'])->find($row[$idName]);
 							} else if ($reflection->getConstructor()->getNumberOfRequiredParameters() === 0) {
 								$obj = new $info['targetEntity'];
