@@ -204,7 +204,12 @@ class Doctrine {
 					if (!$row instanceof $info['targetEntity']) {
 						if (is_array($row)) {
 							$reflection = new \ReflectionClass($info['targetEntity']);
-							if ($reflection->getConstructor()->getNumberOfRequiredParameters() === 0) {
+							$idName = $this->em
+								->getClassMetadata($info['targetEntity'])
+								->getSingleIdentifierFieldName();
+							if (!empty($row[$idName]) && $this->isInFind($name)) {
+								$obj = $this->em->getRepository($info['targetEntity'])->find($row[$idName]);
+							} else if ($reflection->getConstructor()->getNumberOfRequiredParameters() === 0) {
 								$obj = new $info['targetEntity'];
 							} else {
 								$obj = new \stdClass();
@@ -327,19 +332,32 @@ class Doctrine {
 	private function propertySet($class, $name, $value) {
 		if ($class instanceof \stdClass) {
 			$class->$name = $value;
-			
+
 			return TRUE;
 		}
 
 		$setter = 'set' . ucfirst($name);
 		if (method_exists($class, $setter)) {
 			call_user_func(array($class, $setter), $value);
-			
+
 			return TRUE;
 		}
 		if (is_array($value)) { // adder
+			$items = call_user_func(array($class, 'get' . ucfirst($name)));
+			$removed = array();
+			foreach ($items as $item) { // cleanup
+				if (! in_array($item, $value, true)) {
+					$removed[] = $item;
+				}
+			}
 			$adder = 'add' . ucfirst($name);
+			$remover = 'remove' . ucfirst($name);
 			for ($i = 0; $i < 3; $i++) { // Plural version with s, es
+				if (method_exists($class, $remover)) {
+					foreach ($removed as $item) {
+						call_user_func(array($class, $remover), $item);
+					}
+				}
 				if (method_exists($class, $adder)) {
 					foreach ($value as $item) {
 						call_user_func(array($class, $adder), $item);
